@@ -35,6 +35,19 @@
     display: flex; align-items: center; justify-content: center;
     min-height: 300px; overflow: hidden;
   }
+  #config {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 16px 18px; margin: 0 0 16px;
+  }
+  #config h2 { font-size: 17px; margin: 0 0 10px; }
+  #config .group { margin-bottom: 14px; }
+  #config label { display: block; padding: 4px 0; cursor: pointer; }
+  #config label.off { color: var(--dim); cursor: not-allowed; }
+  #config .note { color: var(--dim); font-size: 14px; }
+  #config select {
+    background: var(--bg); color: var(--text); border: 1px solid var(--line);
+    border-radius: 8px; padding: 4px 8px; font-size: 15px;
+  }
   #screen canvas { max-width: 100%; height: auto; image-rendering: pixelated; }
   details { margin-top: 18px; }
   summary { cursor: pointer; color: var(--dim); }
@@ -52,15 +65,31 @@
   <header>
     <h1><a href="../">Droid<span class="box">Box</span></a></h1>
     <span id="status">loading emulator…</span>
+    <button id="configure" type="button">Configure</button>
     <button id="restart" type="button">Restart</button>
   </header>
-  <p class="hint">
-    This is a real Android 4.0 (Ice Cream Sandwich) PC, emulated entirely in
-    your browser with WebAssembly (<a href="https://github.com/copy/v86">v86</a>).
-    Nothing runs on a server. Booting takes a few minutes — the CPU is
-    emulated, so be patient. When the lock screen appears, click the screen
-    and drag the ring to unlock. Touch works too.
-  </p>
+  <div id="config" hidden>
+    <h2>Configuration</h2>
+    <div class="group">
+      <strong>Android version</strong>
+      <label><input type="radio" name="version" value="ics" checked>
+        Android 4.0 — Ice Cream Sandwich</label>
+      <label class="off"><input type="radio" name="version" value="froyo" disabled>
+        Android 2.2 — Froyo <span class="note">(doesn't boot yet)</span></label>
+      <label class="off"><input type="radio" name="version" value="donut" disabled>
+        Android 1.6 — Donut <span class="note">(doesn't boot yet)</span></label>
+    </div>
+    <div class="group">
+      <strong>Memory</strong><br>
+      <select id="memory">
+        <option value="256">256 MB</option>
+        <option value="512" selected>512 MB</option>
+        <option value="1024">1024 MB</option>
+      </select>
+    </div>
+    <button id="apply" type="button">Apply &amp; restart</button>
+    <span class="note">Booting takes a few minutes. Click the screen and drag the ring to unlock; touch works too.</span>
+  </div>
   <div id="screen"></div>
   <details>
     <summary>Boot log (guest serial console)</summary>
@@ -80,21 +109,59 @@ const serialEl = document.getElementById("serial");
 let serialText = "";
 let emulator = null;
 
+// Bootable guest images. Only ICS is wired up: the Froyo and Donut
+// builds don't boot yet (they're listed in the config panel, disabled).
+const VERSIONS = {
+    ics: {
+        kernel: "ics-kernel",
+        initrd: "ics-initrd.img",
+        diskUrl: "droidbox-ics.img",
+        diskSize: 577765376,
+        cmdline: "root=/dev/ram0 androidboot.hardware=thinkpad SRC=/android-4.0-r1 console=ttyS0",
+    },
+};
+
+function loadConfig() {
+    let cfg = { version: "ics", memoryMb: 512 };
+    try {
+        const saved = JSON.parse(localStorage.getItem("droidbox-config") || "null");
+        if (saved && VERSIONS[saved.version]) cfg.version = saved.version;
+        if (saved && [256, 512, 1024].includes(saved.memoryMb)) cfg.memoryMb = saved.memoryMb;
+    } catch (e) { /* use defaults */ }
+    return cfg;
+}
+const config = loadConfig();
+
+// Configuration panel
+const configEl = document.getElementById("config");
+document.getElementById("configure").addEventListener("click", () => {
+    configEl.hidden = !configEl.hidden;
+});
+document.querySelector('input[name="version"][value="' + config.version + '"]').checked = true;
+document.getElementById("memory").value = String(config.memoryMb);
+document.getElementById("apply").addEventListener("click", () => {
+    const version = document.querySelector('input[name="version"]:checked').value;
+    const memoryMb = parseInt(document.getElementById("memory").value, 10);
+    localStorage.setItem("droidbox-config", JSON.stringify({ version, memoryMb }));
+    location.reload();
+});
+
 function startEmulator() {
     setStatus("starting emulator…");
+    const v = VERSIONS[config.version];
     emulator = new V86({
     wasm_path: "v86.wasm",
     bios: { url: "seabios.bin" },
     vga_bios: { url: "vgabios.bin" },
-    bzimage: { url: "ics-kernel" },
-    initrd: { url: "ics-initrd.img" },
-    cmdline: "root=/dev/ram0 androidboot.hardware=thinkpad SRC=/android-4.0-r1 console=ttyS0",
+    bzimage: { url: v.kernel },
+    initrd: { url: v.initrd },
+    cmdline: v.cmdline,
     hda: {
-        url: "droidbox-ics.img",
+        url: v.diskUrl,
         async: true,
-        size: 577765376
+        size: v.diskSize
     },
-    memory_size: 512 * 1024 * 1024,
+    memory_size: config.memoryMb * 1024 * 1024,
     vga_memory_size: 8 * 1024 * 1024,
     screen_container: document.getElementById("screen"),
     autostart: true,

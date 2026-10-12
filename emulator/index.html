@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DroidBox — Android 4.0, running in your browser</title>
+<meta name="description" content="Android 4.0 (Ice Cream Sandwich) emulated entirely in your browser with WebAssembly — no server, no install.">
+<style>
+  :root {
+    --bg: #0b0e13; --panel: #12161f; --line: #232a38;
+    --text: #e8ecf3; --dim: #9aa6bb; --accent: #7cc24a; --accent2: #33b5e5;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.6 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 28px 20px 48px; }
+  header { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 6px; }
+  h1 { font-size: 30px; margin: 0; letter-spacing: -0.5px; }
+  h1 .box { color: var(--accent); }
+  h1 a { color: inherit; text-decoration: none; }
+  #status {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 999px;
+    padding: 3px 14px; font-size: 14px; color: var(--accent);
+  }
+  button {
+    background: var(--panel); color: var(--text); border: 1px solid var(--line);
+    border-radius: 999px; padding: 4px 14px; font-size: 14px; cursor: pointer;
+  }
+  button:hover { border-color: var(--accent2); }
+  .hint { color: var(--dim); font-size: 15px; margin: 6px 0 16px; }
+  #screen {
+    background: #000; border: 1px solid var(--line); border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    min-height: 300px; overflow: hidden;
+  }
+  #screen canvas { max-width: 100%; height: auto; image-rendering: pixelated; }
+  details { margin-top: 18px; }
+  summary { cursor: pointer; color: var(--dim); }
+  #diag { color: var(--dim); font: 13px ui-monospace, Menlo, Consolas, monospace; margin: 8px 0; }
+  #serial {
+    white-space: pre-wrap; background: #000; color: #8f8; border: 1px solid var(--line);
+    border-radius: 10px; padding: 10px; height: 260px; overflow-y: auto;
+    font: 12px ui-monospace, Menlo, Consolas, monospace;
+  }
+  a { color: var(--accent2); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1><a href="../">Droid<span class="box">Box</span></a></h1>
+    <span id="status">loading emulator…</span>
+    <button id="restart" type="button">Restart</button>
+  </header>
+  <p class="hint">
+    This is a real Android 4.0 (Ice Cream Sandwich) PC, emulated entirely in
+    your browser with WebAssembly (<a href="https://github.com/copy/v86">v86</a>).
+    Nothing runs on a server. Booting takes a few minutes — the CPU is
+    emulated, so be patient. When the lock screen appears, click the screen
+    and drag the ring to unlock. Touch works too.
+  </p>
+  <div id="screen"></div>
+  <details>
+    <summary>Boot log (guest serial console)</summary>
+    <div id="diag"></div>
+    <div id="serial"></div>
+  </details>
+</div>
+<script src="libv86.js"></script>
+<script>
+"use strict";
+const statusEl = document.getElementById("status");
+const setStatus = (t) => { statusEl.textContent = t; };
+window.addEventListener("error", (e) => setStatus("error: " + e.message));
+document.getElementById("restart").addEventListener("click", () => location.reload());
+
+const serialEl = document.getElementById("serial");
+let serialText = "";
+const emulator = new V86({
+    wasm_path: "v86.wasm",
+    bios: { url: "seabios.bin" },
+    vga_bios: { url: "vgabios.bin" },
+    bzimage: { url: "ics-kernel" },
+    initrd: { url: "ics-initrd.img" },
+    cmdline: "root=/dev/ram0 androidboot.hardware=thinkpad SRC=/android-4.0-r1 console=ttyS0",
+    hda: {
+        url: "https://github.com/kooliros14/kooliros14.github.io/releases/download/ics-disk-v1/droidbox-ics.img",
+        async: true,
+        size: 839909376
+    },
+    memory_size: 512 * 1024 * 1024,
+    vga_memory_size: 8 * 1024 * 1024,
+    screen_container: document.getElementById("screen"),
+    autostart: true,
+});
+emulator.add_listener("emulator-started", () => setStatus("booting Android… (a few minutes)"));
+emulator.add_listener("serial0-output-byte", (byte) => {
+    serialText += String.fromCharCode(byte);
+    if (serialText.length > 60000) serialText = serialText.slice(-60000);
+    serialEl.textContent = serialText;
+    serialEl.scrollTop = serialEl.scrollHeight;
+    if (serialText.includes("found at /dev/sda1")) {
+        setStatus("Android found — starting the system…");
+    }
+});
+setInterval(() => {
+    const c = document.querySelector("#screen canvas");
+    document.getElementById("diag").textContent =
+        "serial chars: " + serialText.length +
+        " | screen: " + (c ? c.width + "x" + c.height : "none") +
+        " | running: " + (typeof emulator.is_running === "function" ? emulator.is_running() : "?");
+}, 3000);
+</script>
+</body>
+</html>

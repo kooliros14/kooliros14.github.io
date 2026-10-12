@@ -67,7 +67,17 @@
     operating system, Holo UI and all, running on your own machine.
   </p>
 
-  <h2>Run it</h2>
+  <h2>Run it in your browser</h2>
+  <p>
+    New: DroidBox also runs <a href="emulator/"><strong>entirely in your
+    browser</strong></a> — the same Android 4.0 guest, emulated in
+    WebAssembly with <a href="https://github.com/copy/v86">v86</a>. No
+    server, no install; the disk image streams in on demand and the whole
+    PC runs inside the page. It's slower than the QEMU version below, so
+    give it a few minutes to boot.
+  </p>
+
+  <h2>Run it locally (QEMU)</h2>
   <pre><code>git clone https://github.com/kooliros14/droidbox.git
 cd droidbox
 ./run.sh</code></pre>
@@ -99,14 +109,6 @@ cd droidbox
       to the guest pointer, with on-screen Back / Home / Menu keys.</p>
     </div>
   </div>
-
-  <h2>Why a static page?</h2>
-  <p class="dim">
-    GitHub Pages hosts static sites only, and an emulator needs a live
-    backend — QEMU can't run inside a web page. So this page is the
-    project's home; the emulator itself runs on your machine with the
-    one command above.
-  </p>
 
   <footer>
     DroidBox · Guest image: Android-x86 4.0-R1 via OSBoxes · Built with QEMU and noVNC

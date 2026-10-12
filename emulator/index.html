@@ -33,8 +33,26 @@
   #screen {
     background: #000; border: 1px solid var(--line); border-radius: 12px;
     display: flex; align-items: center; justify-content: center;
-    min-height: 300px; overflow: hidden;
+    min-height: 300px; overflow: hidden; touch-action: none;
   }
+  /* Full-viewport device mode: the screen is all there is. */
+  body.device { margin: 0; overflow: hidden; background: #000; }
+  body.device header, body.device #config, body.device details { display: none; }
+  body.device main { max-width: none; margin: 0; padding: 0; }
+  body.device #screen {
+    position: fixed; inset: 0; border: none; border-radius: 0; min-height: 0;
+  }
+  body.device #screen canvas {
+    width: 100% !important; height: 100% !important; object-fit: contain;
+  }
+  #exitfs {
+    position: fixed; top: 10px; right: 10px; z-index: 10;
+    background: rgba(20, 26, 43, .85); color: var(--text);
+    border: 1px solid var(--line); border-radius: 999px;
+    padding: 6px 14px; font-size: 14px; cursor: pointer;
+    opacity: 0; transition: opacity .3s; pointer-events: none;
+  }
+  #exitfs.show { opacity: 1; pointer-events: auto; }
   #config {
     background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
     padding: 16px 18px; margin: 0 0 16px;
@@ -87,9 +105,18 @@
         <option value="1024">1024 MB</option>
       </select>
     </div>
+    <div class="group">
+      <strong>Display</strong>
+      <label><input type="checkbox" id="fullscreen">
+        Full viewport — the screen fills the window and all other controls
+        are hidden, like a real Android device</label>
+      <span class="note">In full-viewport mode, move the pointer (or tap) to
+        reveal an exit button in the top-right corner, or press Esc.</span>
+    </div>
     <button id="apply" type="button">Apply &amp; restart</button>
     <span class="note">Booting takes a few minutes. Click the screen and drag the ring to unlock; touch works too.</span>
   </div>
+  <button id="exitfs" type="button" hidden>✕ Exit full view</button>
   <div id="screen"></div>
   <details>
     <summary>Boot log (guest serial console)</summary>
@@ -122,11 +149,12 @@ const VERSIONS = {
 };
 
 function loadConfig() {
-    let cfg = { version: "ics", memoryMb: 512 };
+    let cfg = { version: "ics", memoryMb: 512, fullscreen: false };
     try {
         const saved = JSON.parse(localStorage.getItem("droidbox-config") || "null");
         if (saved && VERSIONS[saved.version]) cfg.version = saved.version;
         if (saved && [256, 512, 1024].includes(saved.memoryMb)) cfg.memoryMb = saved.memoryMb;
+        if (saved && saved.fullscreen === true) cfg.fullscreen = true;
     } catch (e) { /* use defaults */ }
     return cfg;
 }
@@ -139,12 +167,40 @@ document.getElementById("configure").addEventListener("click", () => {
 });
 document.querySelector('input[name="version"][value="' + config.version + '"]').checked = true;
 document.getElementById("memory").value = String(config.memoryMb);
+document.getElementById("fullscreen").checked = config.fullscreen;
 document.getElementById("apply").addEventListener("click", () => {
     const version = document.querySelector('input[name="version"]:checked').value;
     const memoryMb = parseInt(document.getElementById("memory").value, 10);
-    localStorage.setItem("droidbox-config", JSON.stringify({ version, memoryMb }));
+    const fullscreen = document.getElementById("fullscreen").checked;
+    localStorage.setItem("droidbox-config", JSON.stringify({ version, memoryMb, fullscreen }));
     location.reload();
 });
+
+// Full-viewport device mode
+const exitBtn = document.getElementById("exitfs");
+function exitFullscreen() {
+    document.body.classList.remove("device");
+    exitBtn.hidden = true;
+    config.fullscreen = false;
+    document.getElementById("fullscreen").checked = false;
+    localStorage.setItem("droidbox-config", JSON.stringify(config));
+    window.dispatchEvent(new Event("resize"));
+}
+if (config.fullscreen) {
+    document.body.classList.add("device");
+    exitBtn.hidden = false;
+    let hideTimer = null;
+    const flashExit = () => {
+        exitBtn.classList.add("show");
+        clearTimeout(hideTimer);
+        hideTimer = setTimeout(() => exitBtn.classList.remove("show"), 2500);
+    };
+    window.addEventListener("pointermove", flashExit);
+    window.addEventListener("pointerdown", flashExit);
+    exitBtn.addEventListener("click", exitFullscreen);
+    window.addEventListener("keydown", (e) => { if (e.key === "Escape") exitFullscreen(); });
+    flashExit();
+}
 
 function startEmulator() {
     setStatus("starting emulator…");

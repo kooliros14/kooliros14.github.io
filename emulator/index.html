@@ -78,7 +78,11 @@ document.getElementById("restart").addEventListener("click", () => location.relo
 
 const serialEl = document.getElementById("serial");
 let serialText = "";
-const emulator = new V86({
+let emulator = null;
+
+function startEmulator() {
+    setStatus("starting emulator…");
+    emulator = new V86({
     wasm_path: "v86.wasm",
     bios: { url: "seabios.bin" },
     vga_bios: { url: "vgabios.bin" },
@@ -86,31 +90,54 @@ const emulator = new V86({
     initrd: { url: "ics-initrd.img" },
     cmdline: "root=/dev/ram0 androidboot.hardware=thinkpad SRC=/android-4.0-r1 console=ttyS0",
     hda: {
-        url: "https://github.com/kooliros14/kooliros14.github.io/releases/download/ics-disk-v1/droidbox-ics.img",
+        url: "droidbox-ics.img",
         async: true,
-        size: 839909376
+        size: 577765376
     },
     memory_size: 512 * 1024 * 1024,
     vga_memory_size: 8 * 1024 * 1024,
     screen_container: document.getElementById("screen"),
     autostart: true,
-});
-emulator.add_listener("emulator-started", () => setStatus("booting Android… (a few minutes)"));
-emulator.add_listener("serial0-output-byte", (byte) => {
-    serialText += String.fromCharCode(byte);
-    if (serialText.length > 60000) serialText = serialText.slice(-60000);
-    serialEl.textContent = serialText;
-    serialEl.scrollTop = serialEl.scrollHeight;
-    if (serialText.includes("found at /dev/sda1")) {
-        setStatus("Android found — starting the system…");
+    });
+    emulator.add_listener("emulator-started", () => setStatus("booting Android… (a few minutes)"));
+    emulator.add_listener("serial0-output-byte", (byte) => {
+        serialText += String.fromCharCode(byte);
+        if (serialText.length > 60000) serialText = serialText.slice(-60000);
+        serialEl.textContent = serialText;
+        serialEl.scrollTop = serialEl.scrollHeight;
+        if (serialText.includes("found at /dev/sda1")) {
+            setStatus("Android found — starting the system…");
+        }
+    });
+}
+
+// The guest disk is served by a service worker that stitches block
+// files together, so the emulator must not start until it controls
+// this page.
+async function boot() {
+    if (!("serviceWorker" in navigator)) {
+        setStatus("error: this browser does not support service workers");
+        return;
     }
-});
+    try {
+        await navigator.serviceWorker.register("disk-sw.js");
+        await navigator.serviceWorker.ready;
+        if (!navigator.serviceWorker.controller) {
+            await new Promise((res) => navigator.serviceWorker.addEventListener(
+                "controllerchange", res, { once: true }));
+        }
+        startEmulator();
+    } catch (err) {
+        setStatus("error: disk service failed to start (" + err.message + ")");
+    }
+}
+boot();
 setInterval(() => {
     const c = document.querySelector("#screen canvas");
     document.getElementById("diag").textContent =
         "serial chars: " + serialText.length +
         " | screen: " + (c ? c.width + "x" + c.height : "none") +
-        " | running: " + (typeof emulator.is_running === "function" ? emulator.is_running() : "?");
+        " | running: " + (emulator && typeof emulator.is_running === "function" ? emulator.is_running() : "?");
 }, 3000);
 </script>
 </body>

@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DroidBox — Android 4.0 in your browser</title>
+<meta name="description" content="DroidBox boots a real Android 4.0 (Ice Cream Sandwich) x86 VM with QEMU and streams it to a full-window, touch-friendly browser canvas over VNC/WebSocket.">
+<style>
+  :root {
+    --bg: #0b0e13; --panel: #12161f; --line: #232a38;
+    --text: #e8ecf3; --dim: #9aa6bb; --accent: #7cc24a; --accent2: #33b5e5;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.6 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 48px 20px 64px; }
+  header { text-align: center; margin-bottom: 36px; }
+  h1 { font-size: 44px; margin: 0 0 8px; letter-spacing: -0.5px; }
+  h1 .box { color: var(--accent); }
+  .tag { color: var(--dim); font-size: 19px; margin: 0; }
+  .shot {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    padding: 14px; margin: 0 auto 14px; max-width: 860px;
+  }
+  .shot img { display: block; width: 100%; height: auto; border-radius: 8px; }
+  .cap { color: var(--dim); text-align: center; font-size: 14px; margin: 0 0 36px; }
+  h2 { font-size: 24px; margin: 36px 0 10px; }
+  p { margin: 0 0 14px; }
+  .dim { color: var(--dim); }
+  pre {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: 16px 18px; overflow-x: auto; font-size: 15px; line-height: 1.55;
+  }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  p code, li code {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 5px;
+    padding: 1px 6px; font-size: 14px;
+  }
+  ul { margin: 0 0 14px; padding-left: 22px; }
+  li { margin-bottom: 6px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; margin: 18px 0 6px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; }
+  .card h3 { margin: 0 0 6px; font-size: 17px; }
+  .card p { margin: 0; color: var(--dim); font-size: 15px; }
+  a { color: var(--accent2); }
+  footer { margin-top: 48px; border-top: 1px solid var(--line); padding-top: 18px; color: var(--dim); font-size: 14px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Droid<span class="box">Box</span></h1>
+    <p class="tag">Android 4.0 “Ice Cream Sandwich” — a real VM, streamed to your browser.</p>
+  </header>
+
+  <div class="shot"><img src="lockscreen.png" alt="Android 4.0 lock screen running in DroidBox"></div>
+  <p class="cap">The actual guest, booted by DroidBox: Android 4.0 lock screen at 800×600.</p>
+
+  <h2>What it is</h2>
+  <p>
+    DroidBox boots a genuine x86 build of Android 4.0 (the Android-x86 /
+    OSBoxes 4.0-R1 image) under QEMU and streams the display to a
+    full-window, touch-friendly browser canvas using VNC over WebSocket
+    (noVNC). It is not a skin or a simulator theme — it is the real 2011
+    operating system, Holo UI and all, running on your own machine.
+  </p>
+
+  <h2>Run it</h2>
+  <pre><code>git clone https://github.com/kooliros14/droidbox.git
+cd droidbox
+./run.sh</code></pre>
+  <p>
+    Then open <code>http://localhost:8080</code>. The first run downloads
+    the guest image (~145&nbsp;MB, SHA-256 verified), builds the base disk,
+    and boots Android; later runs go straight to booting. Requirements:
+    Python 3, QEMU, and 7z — <code>run.sh</code> installs them via apt or
+    Homebrew when it can. Linux, macOS, or Windows via WSL2.
+  </p>
+
+  <h2>How it works</h2>
+  <div class="grid">
+    <div class="card">
+      <h3>Real emulation</h3>
+      <p>QEMU runs the VM with direct kernel boot and a fresh disposable
+      overlay disk per boot. KVM on Linux and HVF on macOS are used
+      automatically when available; TCG software emulation otherwise.</p>
+    </div>
+    <div class="card">
+      <h3>One tiny server</h3>
+      <p>A stdlib-only Python server serves the UI, a small JSON API, and
+      the WebSocket→VNC bridge on a single port. No dependencies to pip
+      install, no accounts, no cloud.</p>
+    </div>
+    <div class="card">
+      <h3>Touch-first client</h3>
+      <p>The browser client fills the window; taps, drags, and clicks map
+      to the guest pointer, with on-screen Back / Home / Menu keys.</p>
+    </div>
+  </div>
+
+  <h2>Why a static page?</h2>
+  <p class="dim">
+    GitHub Pages hosts static sites only, and an emulator needs a live
+    backend — QEMU can't run inside a web page. So this page is the
+    project's home; the emulator itself runs on your machine with the
+    one command above.
+  </p>
+
+  <footer>
+    DroidBox · Guest image: Android-x86 4.0-R1 via OSBoxes · Built with QEMU and noVNC
+  </footer>
+</div>
+</body>
+</html>
